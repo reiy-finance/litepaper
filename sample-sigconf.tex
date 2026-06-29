@@ -542,6 +542,29 @@ the entire batch in one PTB, shown in Figure~\ref{fig:settle}, so the
 verification, the release of escrow, and the delivery of payouts either all commit
 or all revert.
 
+Two properties of the Sui execution model make this possible. A PTB composes
+several Move calls into one transaction and passes the typed result of one call as
+the input to the next, so a value produced by verification can be threaded into
+the calls that release escrow and deliver payouts without ever leaving the
+transaction. The \emph{hot potato} pattern then makes that threading mandatory. A
+Move value whose type has none of the \texttt{copy}, \texttt{drop}, \texttt{store},
+or \texttt{key} abilities cannot be copied, discarded, or stored; it can only be
+unpacked by a function in its defining module. A value of such a type created in
+the middle of a PTB therefore obligates a later call in the same PTB to consume
+it, or the transaction is not well formed and cannot execute. Reiy uses this to
+turn a procedural settlement into a guarantee enforced by the type system rather
+than by trust.
+
+Concretely, \texttt{take\_authorized\_intent} returns the escrowed sell coin
+together with a \texttt{SettlementReceipt} that has no abilities, a true hot
+potato. The receipt records the intent and its certified payout, and the only
+function that can consume it is \texttt{settle\_intent}. The instant a solver
+takes an intent's escrow it holds a receipt it cannot drop, store, or pass
+outside the transaction, so it is compelled to call \texttt{settle\_intent} and
+deliver the exact certified payout within the same PTB. There is no path in which
+escrow leaves the contract without a matching settlement, and the property holds
+for every intent in the batch at once.
+
 \begin{figure}[htbp]
   \centering
   \resizebox{\columnwidth}{!}{%
@@ -584,11 +607,9 @@ Second, each \texttt{take\_authorized\_intent} call advances through the certifi
 list in order, and requires that the intent id matches the next entry, that the
 intent's \texttt{target\_epoch} equals the certificate epoch, that it has not
 expired or already been partially filled this epoch, and that the committed
-\texttt{protected\_min} is at least the intent's own minimum. It hands back the
-escrowed sell coin and a \texttt{SettlementReceipt} that carries no drop ability.
-That receipt is a hot potato: the PTB cannot end until it is consumed by
-\texttt{settle\_intent}, which forces the solver to actually settle every intent
-it takes.
+\texttt{protected\_min} is at least the intent's own minimum. It returns the
+escrowed sell coin and the \texttt{SettlementReceipt} hot potato described above,
+which obligates the matching \texttt{settle\_intent} call.
 
 Third, \texttt{settle\_intent} requires that the delivered buy coin equals the
 certified gross payout exactly, confirms the solver is active and bonded, deducts
