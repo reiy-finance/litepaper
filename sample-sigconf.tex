@@ -1,4 +1,4 @@
-\documentclass[10pt,sigconf]{acmart}
+\documentclass[10pt,sigconf,nonacm]{acmart}
 
 \settopmatter{printacmref=false, printccs=false, printfolios=false}
 
@@ -103,54 +103,36 @@ turns the ecosystem's fragmented liquidity into depth a single trade can reach.
 
 \subsection{A Mature DeFi Stack on Sui}
 
-Sui has grown into one of the most complete environments for decentralized
-finance. Its object centric data model and parallel execution engine give
-builders low latency settlement and cheap fees, and the ecosystem now offers a
-full range of exchange primitives on top of this foundation
-\cite{suidefistack}. Traders can route through automated market makers, post and
-take on the native central limit order book in DeepBook, or rely on aggregators
-that stitch these venues together. Lending, derivatives, and structured products
-round out a stack that already serves a large and active user base.
+Sui hosts a mature DeFi stack, spanning automated market makers, a native central
+limit order book in DeepBook, aggregators, lending, and derivatives, on an object
+centric, parallel execution base with low latency and cheap fees \cite{suidefistack}.
 % TODO(cite): Sui DeFi TVL milestone, e.g. DefiLlama Sui chain page and
 % "Sui TVL Hits Record $2.6 Billion" (The Defiant, 2025) for a concrete figure.
 
-Sui no longer lacks places to trade. What it lacks is a layer that turns this
-breadth into a single efficient market rather than a set of isolated ones.
+The ecosystem does not lack places to trade; it lacks a layer that turns this
+breadth into one efficient market rather than a set of isolated venues.
 
-\subsection{Fragmentation and the Persistence of Slippage}
+\subsection{Fragmentation and Slippage}
 
-Every venue holds its own liquidity. An automated market maker, an order book,
-and an aggregator each price the same pair against a different and partial view
-of available depth, so capital that could clear a trade together sits divided
-across protocols. A trader who wants the best outcome must compare venues, split
-orders, and absorb the overhead of doing so manually.
-
-Underneath this fragmentation lies a cost that no single venue can design away.
-Slippage, the gap between a quoted price and the realized one, grows with trade
-size and shrinks with available depth. Constant product pools price it directly
-into their curve, and order books express it through limited depth at the top of
-book. Every exchange tries to minimize slippage, yet none can remove it while
-its liquidity stays siloed. The deeper the fragmentation, the worse the realized
-price, and the more value leaks to arbitrage and reordering rather than to the
-user.
+Liquidity is fragmented: each venue prices a pair against its own partial view of
+depth, so capital that could clear a trade jointly sits divided, and a trader
+seeking best execution must compare venues and split orders by hand. Fragmentation
+also fixes a floor on slippage that no venue can remove while its liquidity stays
+siloed; the deeper the split, the worse the realized price and the more value leaks
+to arbitrage and reordering rather than to the user.
 
 \subsection{Why Existing Intent Markets Fall Short}
 
-Intent based trading offers a way out. Rather than choosing a venue, a user
-states what they want, such as a minimum amount to receive, and delegates
-execution to agents who compete to satisfy it. CoW Protocol on Ethereum has
-shown that this design can match opposing orders directly and aggregate external
-liquidity to beat single venue execution \cite{documentationcowdaoe}.
-
-The model is not without tension. A recent analysis of intent based markets
-shows that the costs solvers must pay to participate restrict entry, and that
-the resulting competition can collapse toward a small oligopoly
-\cite{chitra2024analysisintentbasedmarkets}. When few agents compete, the
-execution quality that intents promise to users erodes. Any intent system on a
-new chain must therefore treat open and permissionless solver participation as a
-first class design goal, not an afterthought. To date, no such system exists
-natively on Sui, and designs built for Ethereum do not transfer cleanly to its
-object centric model.
+Intent based trading addresses this: a user states a desired outcome, such as a
+minimum to receive, and delegates execution to competing agents. CoW Protocol
+demonstrates the design on Ethereum, matching opposing orders directly and
+aggregating external liquidity to beat single venue execution
+\cite{documentationcowdaoe}. Its weakness is competition itself: solver
+participation costs restrict entry and can drive the market toward oligopoly,
+eroding the execution quality intents promise
+\cite{chitra2024analysisintentbasedmarkets}. A viable intent system must therefore
+make permissionless solver participation a first class goal. None exists natively on
+Sui, and Ethereum designs do not transfer to its object centric model.
 
 \subsection{Reiy}
 
@@ -172,61 +154,43 @@ and the REIY token, and Section~8 the resulting security properties.
 \section{Background and Preliminaries}
 % ================================================================
 
-This section introduces the primitives the rest of the paper relies on. Readers
-familiar with Sui and intent based trading may skip ahead.
+This section fixes the primitives and the research question; readers fluent in Sui
+and intent trading may skip ahead.
 
 \subsection{The Sui Execution Model}
 
-Sui organizes state as typed objects rather than as entries in a global account
-map \cite{suidefistack}.
+Reiy relies on two features of Sui's object model \cite{suidefistack}. A
+\emph{shared object} holds escrowed user assets that any party may act on under
+contract enforced rules. And a Programmable Transaction Block (PTB) composes several
+Move calls into one atomic transaction, where Move's linear \emph{hot potato} type
+forces a value created mid block to be consumed before the block ends. Together they
+let Reiy escrow funds on chain and settle a batch in a single all-or-nothing
+transaction; Section~5.6 develops the hot potato in detail.
 % TODO(cite): Sui whitepaper, https://docs.sui.io/paper/sui.pdf, for the object model.
-An object is either owned by an address or shared, and a transaction declares
-the objects it touches. Independent transactions then execute in parallel, which
-gives Sui sub second finality and low fees. Two features matter for Reiy. First,
-a \emph{shared object} can hold escrowed user assets that many parties may
-interact with under rules the contract enforces. Second, a Programmable
-Transaction Block (PTB) chains several Move calls into one atomic transaction,
-and Move's linear \emph{hot potato} type lets a value created early in a PTB be
-required to be consumed before the block ends. Together these let Reiy escrow
-funds on chain and settle a whole batch in a single transaction that either
-fully succeeds or fully reverts.
 
 \subsection{Liquidity and the On-Chain Price Reference}
 
-Sui hosts a full set of trading venues across automated market makers, order
-books, and aggregators. Liquidity is partitioned across them, so a given pair is
-priced against a different and partial view of total depth. Reiy depends on this
-ecosystem in only one structural way: it reads a canonical on chain price. DeepBook,
-the native central limit order book, exposes a per pool mid price that a contract
-can query directly \cite{querypoolsui}, and Reiy uses this mid price as the
-admission reference of Section~5. How a solver subsequently sources liquidity is
-left entirely to the solver and is outside the protocol.
+Reiy depends on the Sui venue landscape in one structural way: it reads a canonical
+on chain price. DeepBook, the native order book, exposes a per pool mid price that a
+contract can query directly \cite{querypoolsui}, which Reiy uses as the admission
+reference of Section~5. How a solver then sources liquidity is outside the protocol.
 
 \subsection{Intents, Solvers, and Batch Auctions}
 
-In an intent based market a user does not select a venue or a route. The user
-signs an \emph{intent}, a statement of the desired outcome such as a minimum
-amount to receive, and delegates execution to agents called \emph{solvers} that
-compete to satisfy it \cite{documentationcowdaoe}. Aggregating intents into time
-bounded \emph{batches} admits a coincidence of wants, in which opposing orders
-clear against one another without price impact, and lets a solver source only the
-residual externally.
+A user signs an \emph{intent}, a desired outcome such as a minimum to receive, and
+delegates execution to competing \emph{solvers} \cite{documentationcowdaoe}; batching
+intents admits a coincidence of wants, where opposing orders clear without price
+impact and only the residual is sourced externally.
 
-In prevailing designs the intent and all coordination around it, including the
-auction and the choice of solver, live off chain; only settlement touches the
-chain. That off chain locus is what affords stable latency and low cost, since the
-expensive coordination never pays for on chain execution. This frames Reiy's
-central question: can an intent be escrowed and enforced on chain, making custody
-and user protection trustless, while keeping the latency and cost of an off chain
-market? Reiy answers yes, by escrowing the intent on chain and confining the off
-chain coordinator to selection and signing.
-
-A second tension concerns competition. A formal analysis of intent markets shows
-that the cost of participating as a solver restricts entry and can drive the market
-toward oligopoly, eroding the execution quality intents promise
-\cite{chitra2024analysisintentbasedmarkets}. Reiy therefore treats permissionless
-solver participation as a first class requirement, and Section~5 shows how on chain
-verification makes it safe to admit any solver.
+In prevailing designs the intent and all coordination around it live off chain, and
+only settlement touches the chain; that off chain locus is what affords stable latency
+and low cost. This frames Reiy's central question: can an intent be escrowed and
+enforced on chain, making custody and user protection trustless, while keeping the
+latency and cost of an off chain market? Reiy answers yes, by escrowing the intent on
+chain and confining the off chain coordinator to selection and signing. Its second
+requirement, permissionless solver participation against the oligopoly tendency of
+intent markets \cite{chitra2024analysisintentbasedmarkets}, is made safe by on chain
+verification (Section~5).
 
 % ================================================================
 \section{System Model}
@@ -406,8 +370,9 @@ model of Section~7 aligns incentives without touching protected funds.
 
 The protocol is built from five core constructs: the \emph{intent}, the
 \emph{SBBO floor}, the \emph{solver}, the \emph{certificate}, and the
-\emph{settlement transaction}. We define each in turn and then describe epoch
-progression. The construct names and parameters follow the Move implementation.
+\emph{settlement transaction}, governed by a \emph{uniform clearing price} that keeps
+each batch fair. We define each in turn and then describe epoch progression. The
+construct names and parameters follow the Move implementation.
 
 \subsection{Intents}
 
@@ -480,12 +445,81 @@ well formed and unexpired, and each entry satisfies
 \[
   \mathit{gross\ payout} \ge \mathit{protected\ min} \ge \mathit{user\ minimum},
 \]
-with a positive fill not exceeding the intent's remaining amount. Valid solutions
-are ranked by score and the highest wins, ties broken deterministically. Because
-admission is permissionless and ranking depends only on score, any outside solver
-can win by offering strictly better execution, which is the structural
+with a positive fill not exceeding the intent's remaining amount. Within a directed
+market the payouts must additionally form a uniform clearing price (Section~5.4),
+so solvers compete by raising that price, not by discriminating between users. Valid
+solutions are ranked by score and the highest wins, ties broken deterministically.
+Because admission is permissionless and ranking depends only on score, any outside
+solver can win by offering strictly better execution, which is the structural
 countermeasure to the entry barriers that drive intent markets toward oligopoly
 \cite{chitra2024analysisintentbasedmarkets}.
+
+\subsection{Fairness: the Uniform Clearing Price}
+
+\begin{definition}[Clearing price]
+A clearing price is a single exchange rate at which every intent on the same
+directed market in a batch settles, so that no user is filled at a worse price than
+another on that market.
+\end{definition}
+
+\noindent The per intent floors of Section~5.2 protect each user in isolation but
+say nothing about how users on the same market fare relative to one another, which
+would let a solver cherry pick: fill one order at an excellent price and another at
+only its floor. Reiy removes that discretion with a uniform clearing price, the
+fairness rule of CoW Protocol \cite{documentationcowdaoe}. Let intent $i$ sell $x_i$
+and receive $p_i$. A solution settles a directed market at a single price $\pi$ when
+\[
+  p_i = x_i\,\pi \quad\text{for every intent } i \text{ on the market,}
+\]
+equivalently when $p_i / x_i$ is equal across them. Two conditions bind $\pi$. It
+must clear every floor, $p_i \ge \mathit{protected\ min}_i$, so
+$\pi \ge \max_i (\mathit{protected\ min}_i / x_i)$: the tightest floor per unit sold
+sets the lowest admissible price. And competition drives it upward, since a solver
+wins by delivering more total surplus,
+\[
+  \sum_i \bigl(p_i - \mathit{protected\ min}_i\bigr)
+    = \pi \sum_i x_i - \sum_i \mathit{protected\ min}_i,
+\]
+which grows with $\pi$. The winning solution is the highest uniform price the batch's
+sourced liquidity can support.
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{0.9\columnwidth}{!}{%
+  \begin{tikzpicture}[font=\footnotesize, >={Stealth[length=2mm]}]
+    \draw[->, line width=0.5pt] (0,0) -- (6,0) node[right, font=\scriptsize]{amount sold $x$};
+    \draw[->, line width=0.5pt] (0,0) -- (0,4) node[above, font=\scriptsize]{received $p$};
+    \draw[cOn, line width=1pt] (0,0) -- (5.4,3.7)
+      node[above right, font=\scriptsize, cOn]{clearing price $\pi$};
+    \draw[cOff, dashed, line width=0.8pt] (0,0) -- (5.4,2.75)
+      node[right, font=\scriptsize, cOff]{$\pi'$ too low};
+    \foreach \x/\f/\n in {1.4/0.72/A, 2.9/1.62/B, 4.3/2.6/C} {
+      \pgfmathsetmacro\p{0.685*\x}
+      \fill[cOn] (\x,\p) circle (2pt) node[above left, font=\scriptsize]{\n};
+      \fill[cSup] (\x,\f) circle (1.6pt);
+      \draw[cSup, dashed] (\x,\f) -- (\x,\p);
+    }
+    \node[cSup, font=\scriptsize, anchor=north] at (4.3,2.6) {floor};
+    \node[font=\scriptsize\itshape, cSup] at (2.0,3.5) {one price for all, each above its floor};
+  \end{tikzpicture}}
+  \caption{Uniform clearing price. Every intent on a market lies on one price ray
+    $\pi$, and the gap from each user's floor up to the ray is its surplus. A lower
+    price $\pi'$ is infeasible because it would breach the tightest floor.}
+  \label{fig:clearing}
+\end{figure}
+
+The Contract enforces uniformity on chain. For the intents of one directed market it
+checks that $p_i / x_i$ is equal within a small tolerance, a cross multiplication
+$p_i\,x_j = p_j\,x_i$ that avoids division, alongside the per intent floor check. Fair
+pricing is therefore not a matter of solver honesty but a verified on chain invariant:
+every user on a market receives the same price, and that price still clears each
+user's SBBO floor.
+
+This is the uniform clearing price of a batch auction, produced here by permissionless
+competition rather than assumed after the fact. A fair combinatorial auction shows that
+competition among solvers can construct such a fairness benchmark endogenously, from the
+solvers' own bids, without the protocol needing to know the fair price in advance
+\cite{canidio2025faircombinatorialauctiona}.
 
 \subsection{Certificates}
 
@@ -515,28 +549,23 @@ where Reiy exploits the structure of Sui transactions. The winning solver execut
 the whole batch in one PTB (Figure~\ref{fig:settle}), so verification, the release
 of escrow, and the delivery of payouts all commit or all revert.
 
-Two properties of the Sui execution model make this possible. A PTB composes
-several Move calls into one transaction and passes the typed result of one call as
-the input to the next, so a value produced by verification can be threaded into
-the calls that release escrow and deliver payouts without ever leaving the
-transaction. The \emph{hot potato} pattern then makes that threading mandatory. A
-Move value whose type has none of the \texttt{copy}, \texttt{drop}, \texttt{store},
-or \texttt{key} abilities cannot be copied, discarded, or stored; it can only be
-unpacked by a function in its defining module. A value of such a type created in
-the middle of a PTB therefore obligates a later call in the same PTB to consume
-it, or the transaction is not well formed and cannot execute. Reiy uses this to
-turn a procedural settlement into a guarantee enforced by the type system rather
-than by trust.
+Two properties of Sui make this possible. A PTB threads the typed result of one
+Move call into the next, so a value produced by verification flows through the calls
+that release escrow and deliver payouts without leaving the transaction. The
+\emph{hot potato} pattern makes that threading mandatory: a Move value whose type
+has none of \texttt{copy}, \texttt{drop}, \texttt{store}, or \texttt{key} cannot be
+copied, discarded, or stored, only unpacked by a function in its defining module, so
+a value created mid PTB obligates a later call to consume it or the transaction is
+ill formed. Settlement thus becomes a type system guarantee rather than a matter of
+trust.
 
-Concretely, \texttt{take\_authorized\_intent} returns the escrowed sell coin
-together with a \texttt{SettlementReceipt} that has no abilities, a true hot
-potato. The receipt records the intent and its certified payout, and the only
-function that can consume it is \texttt{settle\_intent}. The instant a solver
-takes an intent's escrow it holds a receipt it cannot drop, store, or pass
-outside the transaction, so it is compelled to call \texttt{settle\_intent} and
-deliver the exact certified payout within the same PTB. There is no path in which
-escrow leaves the contract without a matching settlement, and the property holds
-for every intent in the batch at once.
+Concretely, \texttt{take\_authorized\_intent} returns the escrowed sell coin and a
+\texttt{SettlementReceipt} with no abilities, a true hot potato consumable only by
+\texttt{settle\_intent}. The moment a solver takes an intent's escrow it holds a
+receipt it cannot drop, store, or move outside the transaction, so it must call
+\texttt{settle\_intent} with the exact certified payout in the same PTB. No escrow
+leaves the contract without a matching settlement, for every intent in the batch at
+once.
 
 \begin{figure}[htbp]
   \centering
@@ -778,40 +807,28 @@ precisely when users are filled better than their floor, never at their expense.
 
 \subsection{Business Model}
 
-Reiy sells execution quality. Its product is the surplus that a competitive solver
-network delivers over what a trader would obtain unaided, and the protocol
-monetizes a slice of that surplus rather than the trader's principal. Since the
-total fee is bounded so the net stays at or above the protected minimum
-(Section~7.1), every unit of revenue is drawn from value the network created,
-never from the amount the user was guaranteed. The business is positive sum: Reiy
-earns only when it makes a trader better off.
+Reiy monetizes a slice of the surplus a competitive solver network delivers, not
+the trader's principal. Because the fee is bounded so the net never drops below the
+protected minimum (Section~7.1), revenue comes only from value the network created.
+The business is positive sum: Reiy earns only when a trader is filled better.
 
-Revenue arrives in two streams that hedge one another. The \emph{base fee} is a
-thin, volume linked charge that scales with settled value and yields a predictable
-floor even when solver competition compresses surplus toward zero. The
-\emph{surplus fee} is a value linked charge that scales with the price improvement
-actually delivered, and is largest exactly when execution quality is highest. In a
-maturing market the two move in opposite directions: sharper competition erodes per
-trade surplus but attracts more flow, so the base fee floor grows as the surplus
-fee thins. Revenue therefore does not collapse in the very equilibrium that best
-serves users.
+Revenue has two hedging streams. The \emph{base fee} scales with settled volume and
+holds a floor even when competition drives surplus toward zero; the \emph{surplus
+fee} scales with delivered price improvement and peaks when execution is best. As
+competition sharpens, per trade surplus thins but volume grows, so revenue does not
+collapse in the equilibrium that best serves users.
 
-The unit economics are favorable. Revenue per trade is capped at 0.25\% of notional
-and in practice sits well below that, while the protocol's marginal cost to settle
-a trade is close to zero: the winning solver pays settlement gas, and the off chain
-coordinator is a fixed cost that does not grow with volume. Gross margin per settled
-trade is thus high, and the protocol's real cost base is not settlement but the
-incentive it pays to keep the solver side competitive.
+Unit economics are favorable: revenue per trade is capped at 0.25\% of notional while
+the protocol's marginal settlement cost is near zero, since the solver pays gas and
+the coordinator is a fixed cost. The real cost base is not settlement but the
+incentive that keeps solvers competitive.
 
-That incentive is paid in REIY rather than out of the fee, which lets early growth
-run ahead of revenue. Solvers earn REIY on top of the execution margin they already
-capture, so the network can bootstrap a deep, competitive solver set through
-scheduled emissions before fee revenue is material. As volume grows, the treasury,
-which accrues fees in the traded assets, funds the REIY buyback that replenishes the
-reward pool, so emissions taper and real revenue takes over the cost of incentives.
-The crossover, where fee funded buyback covers the rewards needed to retain solvers,
-marks the transition from a subsidized network to a self funding one
-(Figure~\ref{fig:crossover}).
+That incentive is paid in REIY, not from the fee, so early growth runs ahead of
+revenue: emissions bootstrap a competitive solver set before fee revenue is material,
+and solvers earn REIY on top of the execution margin they capture. As volume grows,
+treasury funded buyback replenishes the reward pool and emissions taper. The
+crossover, where buyback covers the rewards needed to retain solvers, marks the shift
+from a subsidized to a self funding network (Figure~\ref{fig:crossover}).
 
 \begin{figure}[htbp]
   \centering
@@ -836,13 +853,11 @@ marks the transition from a subsidized network to a self funding one
   \label{fig:crossover}
 \end{figure}
 
-Value compounds through a clear loop (Figure~\ref{fig:flywheel}). Better execution
-attracts flow, flow produces fees, fees fill the treasury, the treasury funds
-rewards and buyback, and deeper rewards draw more solvers whose competition improves
-execution again. The REIY token captures this loop: its value is underpinned by fee
-funded buyback, its circulating supply is reduced by the bonds solvers must lock, and
-its holders govern the parameters that tune the system. A treasury denominated in
-real traded assets backs the token, rather than the token backing the protocol.
+Value compounds (Figure~\ref{fig:flywheel}): better execution attracts flow, flow
+yields fees, fees fund rewards and buyback, and deeper rewards draw more solvers. REIY
+captures the loop, with fee funded buyback underpinning its value, solver bonds locking
+its supply, and holders governing the parameters. A treasury of real traded assets
+backs the token, not the reverse.
 
 \begin{figure}[htbp]
   \centering
@@ -868,14 +883,12 @@ real traded assets backs the token, rather than the token backing the protocol.
   \label{fig:flywheel}
 \end{figure}
 
-The model's sensitivities are bounded and understood. Surplus, and with it the
-surplus fee, varies with market conditions and competition, which is why the base
-fee exists as a stabilizer. Fees accrue in a basket of traded assets and require a
-treasury policy for conversion and reserves. Reaching the self funding crossover
-depends on volume growth, so until it is reached the reward pool leans on emissions
-and the dilution they imply. Each of these is a governable parameter, set
-conservatively at launch under a multisig and handed to REIY governance as the
-network matures.
+The sensitivities are bounded. Surplus varies with market conditions, which is why
+the base fee stabilizes revenue; fees accrue in a basket of assets, requiring a
+treasury conversion policy; and the crossover depends on volume growth, so until it
+is reached the reward pool leans on emissions and their dilution. Each is a governable
+parameter, set conservatively under a multisig at launch and handed to REIY governance
+as the network matures.
 
 \subsection{The REIY Token}
 
@@ -888,15 +901,9 @@ toward execution quality rather than raw volume. Third, it is the \emph{governan
 right: over time REIY holders govern the protocol parameters, the supported pairs,
 the treasury, and the emission schedule.
 
-Rewards are funded in two complementary ways. Early on, a scheduled emission
-bootstraps a competitive solver set before fee revenue is significant. As volume
-grows, the protocol treasury, which accumulates fees in traded assets, funds REIY
-buyback that replenishes the reward pool, so emissions taper while real revenue
-takes over. Value therefore accrues to the token through a clear loop: usage
-produces fees, fees back the rewards and buyback, and bonding locks supply as a
-sink, while governance grants holders control over the parameters that set all of
-these. The treasury is initially held by an \texttt{AdminCap} under a multisig,
-with a transition to on chain governance as the network matures.
+Reward funding and value accrual follow the loop of Section~7.2. The treasury is
+initially held by an \texttt{AdminCap} under a multisig, transitioning to on chain
+governance as the network matures.
 
 \subsection{Bonding and Slashing}
 
@@ -948,6 +955,14 @@ A settled trader never receives less than the protected minimum, even after fees
 \noindent Two floors enforce this: the SBBO floor at admission and the per intent
 protected minimum at settlement, where the fee logic additionally requires the net
 after fees to stay at or above that minimum.
+
+\begin{property}[Fair pricing]
+All intents on the same market settle at one clearing price that clears every floor,
+so no user is cherry picked.
+\end{property}
+\noindent The Contract verifies that the payout to sell ratio is equal across a
+market by cross multiplication, so uniform pricing is an on chain invariant rather
+than a matter of solver discretion (Section~5.4).
 
 \begin{property}[Atomic settlement]
 A batch either completes in full or reverts in full.
