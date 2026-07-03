@@ -10,7 +10,7 @@ The official github repository for acmart template is here: https://github.com/b
 
 - Clone this repository
 
-- Rename `sample-sigconf.tex` to whatever you would like your main `.tex` file to be called
+- The main source file is `litepaper.tex`
 
 - Adjust `PRJ` variable in `Makefile`, if you would like to use `make` to compile your source.
 
